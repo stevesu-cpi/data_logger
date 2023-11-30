@@ -4,6 +4,7 @@ import sys
 import tempRise
 import pandas as pd
 import matplotlib.pyplot as plt
+import json
 
 def main(input_csv_file, data_path):
     
@@ -109,9 +110,11 @@ def convert_to_intlist(list_str):
     return new_list
 
 if __name__ == '__main__':
-    input_csv = sys.argv[1]
-    path = sys.argv[2] + '/'
-
+    #input_csv = sys.argv[1]
+    #path = sys.argv[2] + '/'
+    input_json = json.load(open('test.conf'))
+    input_csv = input_json['file']
+    path = input_json['path']
     main(input_csv, path)   
     
 

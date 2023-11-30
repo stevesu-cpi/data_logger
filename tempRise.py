@@ -23,7 +23,7 @@ class dataGroup():
         self.min_conversion = 1/60
         self.temp_list = [20,30,40,50]  #temps to evaluate derate time
         self.at_time_temprise = 2 #time in hours at temprise reading
-        
+        self.time_col = 1 #col number for time(s) in dataframe 
         
     
     def make_dict_df(self):
@@ -147,7 +147,63 @@ class dataGroup():
                                
         return derate_dct
             
-            
+    def calculate_derate_time02(self):
+        ''' purpose:calculate derate time as determined by cpe250; 
+            restrictions: there are always two rtds for each cable
+            inputs: none
+            outputs:
+        '''
+        print("\n is data sampled every second? if no results are invalid")
+        trigger_temp = 40
+        time_period = 15 #time in min
+        buff_n = 128
+        derate_dct = {}
+        for file in list(self.dict_df.keys()):
+            derate_dct[file] = {}
+            for ambient_t in self.temp_list:
+                derate_dct[file][ambient_t] = []
+        print('\n derate_dct: ', derate_dct)        
+        delta_dct = self.calculate_delta()
+        for file in delta_dct.keys():
+            df = delta_dct[file]
+            cols_n = len(df.columns)
+            interval = df.iloc[1, self.time_col] - df.iloc[0, self.time_col]
+            print('\n interval in sec is: ', interval)
+            #!!!if you are not sampling every 1s then logic below needs to change
+            for ambient_t in self.temp_list:
+                for col in range(self.start_index, cols_n, 2): #cycle for each pair of rtds
+                    temp0a = df.iloc[0 : buff_n, col].sum() / buff_n
+                    temp0b = df.iloc[0 : buff_n, col + 1].sum() / buff_n
+                    if temp0a < temp0b: #assign larger of the two to temp0a
+                        temp0a = temp0b 
+                        for i in range(60, len(df), 60):  #increment every 60s
+                            if i + buff_n < len(df):  #condition to check upper bound is respected
+                                temp60a = df.iloc[i : i + buff_n, col].sum() / buff_n
+                                temp60b = df.iloc[i : i + buff_n, col + 1].sum() / buff_n
+                                if temp60a < temp60b:
+                                    temp60a = temp60b
+                                if temp60a >= trigger_temp:
+                                    proj_temp = (ambient_t + temp0a) + ((temp60a - temp0a) / 60) * (time_period * 60)
+                                    if proj_temp > self.derate_limit:
+                                        derate_time_s = i
+                                        derate_time_min = derate_time_s / 60
+                                        derate_time_hr = derate_time_min / 60
+                                        if derate_dct[file][ambient_t] == []:
+                                            derate_dct[file][ambient_t] = [derate_time_hr]
+                                        else:
+                                            derate_dct[file][ambient_t].append(derate_time_hr)
+
+                         
+                            else:
+                                if derate_dct[file][ambient_t] == []:
+                                    derate_dct[file][ambient_t] = [None]
+                                else:
+                                    derate_dct[file][ambient_t].append(None)
+                
+                        temp0a = temp60a 
+    
+        return derate_dct   
+        
     def make_temprise_table(self):
         #print('Temp rise deg C:\n')
         delta_dct = self.calculate_delta()
